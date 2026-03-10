@@ -1,10 +1,14 @@
+import argparse
+from sys import exit
 import socket
 from src.models import Commands, Request
 
 
 def parse_user_commands() -> Request:
     inp = (
-        input("HELP:\n\t EXIT\n\t LIST\n\t UPLOAD  <filename>\n\t DOWNLOAD <filename>")
+        input(
+            "HELP:\n\t EXIT\n\t LIST\n\t UPLOAD  <filename>\n\t DOWNLOAD <filename>\n:"
+        )
         .strip()
         .split()
     )
@@ -34,7 +38,6 @@ def parse_user_commands() -> Request:
 
 def send_request(s: socket.socket, addr: tuple[str, int], req: Request) -> None:
 
-    print("Closing connection and exit")
     print(f"Sending requst {req}")
 
     try:
@@ -51,23 +54,45 @@ def send_request(s: socket.socket, addr: tuple[str, int], req: Request) -> None:
     # return data
 
 
+def shutdown_client(s: socket.socket) -> None:
+    s.close()
+    exit(0)
+
+
 print("Starting client")
-SERVER_IP = "127.0.0.1"
-SERVER_PORT = 8000
+
+parser = argparse.ArgumentParser()
+parser.add_argument("PORT", type=int, help="server port", default=8000, nargs="?")
+parser.add_argument("IP", type=str, help="server ip", default="127.0.0.1", nargs="?")
+args = parser.parse_args()
+SERVER_IP = args.IP
+SERVER_PORT = args.PORT
 SERVER_ADDR = (SERVER_IP, SERVER_PORT)
+print(f"Server on {SERVER_ADDR}")
+
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.connect(SERVER_ADDR)
     print(f"Connected to {SERVER_ADDR}")
-    while True:
-        try:
-            req = parse_user_commands()
-        except ValueError as e:
-            print(f"input: bad command {e}")
-            continue
-        try:
-            send_request(s, SERVER_ADDR, req)
-        except Exception as e:
-            print(f"Can't send request error: {e}")
-            continue
+    try:
+        while True:
+            try:
+                req = parse_user_commands()
+            except ValueError as e:
+                print(f"input: bad command {e}")
+                continue
+            try:
+                send_request(s, SERVER_ADDR, req)
+                if req.cmd == Commands.EXIT:
+                    print("Closing client")
+                    shutdown_client(s)
+            except Exception as e:
+                print(f"Can't send request error: {e}")
+                continue
+    except KeyboardInterrupt:
+        print("\nCatched ctrl+c,sending EXIT,stopping client")
+        req: Request = Request(Commands.EXIT, None)
+        send_request(s, SERVER_ADDR, req)
+        s.close()
+        exit(0)
 
 print("Stop client")
