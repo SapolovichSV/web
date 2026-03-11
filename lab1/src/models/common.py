@@ -22,3 +22,14 @@ class Commands(Enum):
                 return Commands.DOWNLOAD
             case _:
                 raise ValueError(f"Trying to deserealize incorrect command {val!r}")
+class Payload:
+    payload: bytes
+
+    def __init__(self, data: bytes):
+        self.payload = data
+
+    def __len__(self) -> int:
+        return len(self.payload)
+
+    def __repr__(self) -> str:
+        return f"ResponsePayload(len={len(self.payload)})"

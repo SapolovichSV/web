@@ -1,10 +1,22 @@
-import inspect
+from typing import Any
 import argparse
-from sys import exit
+import inspect
 import socket
-from src.models.request import Request
+from sys import exit
+
 from src.models.common import Commands
-def debug_print(*args):
+from src.models.request import Request
+from src.models.files import read_file
+
+from src.models.response import (
+    RESPONSE_BASE_SIZE_BYTES,
+    Filenames,
+    NetCode,
+    PayloadType,
+    ResponseHeader,
+)
+
+def debug_print(*args:Any) -> None:
     frame = inspect.currentframe()
     if frame is None:
         print("[unknown location]", *args)
@@ -16,7 +28,6 @@ def debug_print(*args):
     lineno = caller.f_lineno
     filename = caller.f_code.co_filename
     print(f"[{filename}:{lineno}]", *args)
-from src.models.response import ResponseHeader, RESPONSE_BASE_SIZE_BYTES, NetCode,PayloadType,Filenames
 
 
 def parse_user_commands() -> Request:
@@ -99,6 +110,7 @@ def handle_response(s:socket.socket,resp_header: ResponseHeader)->None:
 
 
 
+
 print("Starting client")
 
 parser = argparse.ArgumentParser()
@@ -117,6 +129,13 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         while True:
             try:
                 req: Request = parse_user_commands()
+                if req.cmd == Commands.UPLOAD:
+                    if not req.payload:
+                        print(f"Bad input {req.payload}")
+                        continue
+                    payload = read_file(req.payload)
+
+
             except ValueError as e:
                 print(f"input: bad command {e}")
                 continue

@@ -1,30 +1,21 @@
+from typing import Any
 import os
 import socket
 import argparse
 
-# from src.models import (
-#     REQUEST_BYTES_SIZE,
-#     Request,
-#     Commands,
-#     ResponseHeader,
-#     NetCode,
-#     PayloadType,
-#     ResponsePayload,
-#     Filenames,
-# )
-from src.models.common import Commands
+from src.models.common import Commands, Payload
 from src.models.response import (
     ResponseHeader,
-    ResponsePayload,
     NetCode,
     PayloadType,
     Filenames,
 )
+from src.models.files import read_file
 from src.models.request import REQUEST_BYTES_SIZE, Request
 import inspect
 
 
-def debug_print(*args):
+def debug_print(*args: Any) -> None:
     frame = inspect.currentframe()
     if frame is None:
         print("[unknown location]", *args)
@@ -60,7 +51,7 @@ def send_response_header(
 
 
 def send_response_payload(
-    s: socket.socket, addr: tuple[str, int], payload: ResponsePayload
+    s: socket.socket, addr: tuple[str, int], payload: Payload
 ) -> None:
     debug_print("Sending response payload")
     try:
@@ -84,11 +75,11 @@ def get_files(server_filepath: Filepath) -> list[Filename]:
     return filenames
 
 
-def command_list() -> tuple[ResponseHeader, ResponsePayload]:
+def command_list() -> tuple[ResponseHeader, Payload]:
     filename_list: list[Filename] = get_files(FILEPATH)
     filenames: Filenames = Filenames(filename_list)
     data = filenames.serialize()
-    payload: ResponsePayload = ResponsePayload(data)
+    payload: Payload = Payload(data)
     resp: ResponseHeader = ResponseHeader(NetCode.OK, PayloadType.LIST, len(payload))
     return (resp, payload)
 
@@ -134,5 +125,32 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                             debug_print(f"Can't send command list {e}")
                             debug_print(f"Closing connection with {addr}")
                             conn.close()
+                            break
+                    case Commands.DOWNLOAD:
+                        debug_print(f"Client want download {data_request.payload}")
+                        if not data_request.payload:
+                            raise ValueError("Received bad payload")
+
+                        payload = Payload(bytes())
+                        code = NetCode.ERROR
+                        payload_type = PayloadType.NONE
+                        payload_len = 0
+
+                        try:
+                            payload = Payload(
+                                read_file(os.path.join(FILEPATH, data_request.payload))
+                            )
+                            code = NetCode.OK
+                            payload_type = PayloadType.FILE
+                            payload_len = len(payload)
+                        except (IOError, ValueError) as e:
+                            if isinstance(e, ValueError):
+                                print(
+                                    f"Bad file with name {data_request.payload} error:{e}"
+                                )
+                        finally:
+                            resp = ResponseHeader(code, payload_type, payload_len)
+                            send_response_header(s, addr, resp)
+                            send_response_payload(s, addr, payload)
                     case _:
                         raise RuntimeError("unimplemented")

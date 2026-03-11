@@ -76,17 +76,6 @@ class ResponseHeader:
         return cls(NetCode(code_val), PayloadType(payload_type_val), payload_len)
         # Если payload_type == PAYLOAD_LEN, payload содержит просто длину следующего payload
         # Сервер/клиент должен отдельно обработать этот случай
-class ResponsePayload:
-    payload: bytes
-
-    def __init__(self, data: bytes):
-        self.payload = data
-
-    def __len__(self) -> int:
-        return len(self.payload)
-
-    def __repr__(self) -> str:
-        return f"ResponsePayload(len={len(self.payload)})"
 class Filenames:
     """
     2^26 максимальное кол-во файлов
