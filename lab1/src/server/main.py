@@ -1,20 +1,44 @@
-from typing import Annotated
 import os
-from os import path
 import socket
 import argparse
-from src.models import (
-    REQUEST_BYTES_SIZE,
-    Request,
-    Commands,
+
+# from src.models import (
+#     REQUEST_BYTES_SIZE,
+#     Request,
+#     Commands,
+#     ResponseHeader,
+#     NetCode,
+#     PayloadType,
+#     ResponsePayload,
+#     Filenames,
+# )
+from src.models.common import Commands
+from src.models.response import (
     ResponseHeader,
+    ResponsePayload,
     NetCode,
     PayloadType,
-    ResponsePayload,
     Filenames,
 )
+from src.models.request import REQUEST_BYTES_SIZE, Request
+import inspect
 
-print("Starting server")
+
+def debug_print(*args):
+    frame = inspect.currentframe()
+    if frame is None:
+        print("[unknown location]", *args)
+        return
+    caller = frame.f_back
+    if caller is None:
+        print("[unknown caller]", *args)
+        return
+    lineno = caller.f_lineno
+    filename = caller.f_code.co_filename
+    print(f"[{filename}:{lineno}]", *args)
+
+
+debug_print("Starting server")
 parser = argparse.ArgumentParser()
 
 parser.add_argument("PORT", type=int, help="server port", default=8000, nargs="?")
@@ -22,25 +46,27 @@ parser.add_argument("IP", type=str, help="server ip", default="127.0.0.1", nargs
 args = parser.parse_args()
 HOST = args.IP
 PORT = args.PORT
-print(f"Server on {HOST}:{PORT}")
+debug_print(f"Server on {HOST}:{PORT}")
 
 
 def send_response_header(
     s: socket.socket, addr: tuple[str, int], resp: ResponseHeader
 ) -> None:
-    print("Sending response")
+    debug_print("Sending response header")
     try:
         s.sendall(resp.serialize())
     except OSError as e:
-        print(f"Can't send req {resp} with send error {e}")
+        debug_print(f"Can't send req {resp} with send error {e}")
+
+
 def send_response_payload(
-    s:socket.socket,addr:tuple[str,int],payload:ResponsePayload
+    s: socket.socket, addr: tuple[str, int], payload: ResponsePayload
 ) -> None:
-    print("Sending response")
+    debug_print("Sending response payload")
     try:
         s.sendall(payload.payload)
     except Exception as e:
-        print(f"Can't send response payload, error : {e}")
+        debug_print(f"Can't send response payload, error : {e}")
 
 
 Filepath = str
@@ -50,18 +76,19 @@ Filename = str
 
 def get_files(server_filepath: Filepath) -> list[Filename]:
     filenames: list[Filename] = []
-    # print(f"Server has files on {server_filepath}")
+    debug_print(f"Server has files on {server_filepath}")
     for entry in os.scandir(server_filepath):
         if entry.is_file():
-            print(f"\n\t{entry.name}")
+            # debug_print(f"\n\t{entry.name}")
             filenames.append(entry.name)
     return filenames
 
 
 def command_list() -> tuple[ResponseHeader, ResponsePayload]:
-    filenames: list[Filename] = get_files(FILEPATH)
-    filenames: Filenames = Filenames(filenames)
-    payload: ResponsePayload = ResponsePayload(filenames.serialize())
+    filename_list: list[Filename] = get_files(FILEPATH)
+    filenames: Filenames = Filenames(filename_list)
+    data = filenames.serialize()
+    payload: ResponsePayload = ResponsePayload(data)
     resp: ResponseHeader = ResponseHeader(NetCode.OK, PayloadType.LIST, len(payload))
     return (resp, payload)
 
@@ -72,30 +99,40 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     while True:
         conn, addr = s.accept()
         with conn:
-            print(f"Connected by {addr}")
+            debug_print(f"Connected by {addr}")
             while True:
                 try:
                     data: bytes = conn.recv(REQUEST_BYTES_SIZE)
                     if not data:
                         continue
-                    data: Request = Request.deserialize(data)
+                    data_request: Request = Request.deserialize(data)
                 except KeyboardInterrupt:
-                    print("Catched ctr+c,closing server")
+                    debug_print("Catched ctr+c,closing server")
                     s.close()
                     break
                 except Exception as e:
-                    print(f"error {e}")
+                    debug_print(f"error {e}")
                     continue
-                print(data)
-                match data.cmd:
+                # debug_print(data)
+                match data_request.cmd:
                     case Commands.EXIT:
-                        print(f"clossing connection with client {addr}")
-                        # resp: Response = Response(NetCode.OK, PayloadType.NONE, b"")
+                        debug_print(f"clossing connection with client {addr}")
+                        # resp: ResponseHeader = ResponseHeader(NetCode.OK, PayloadType.NONE, 0)
                         # try:
-                        #     send_response(conn, addr, resp)
+                        #     send_response_header(conn, addr, resp)
                         # except Exception as e:
-                        #     print(f"Error,can't send response {e}")
+                        #     debug_print(f"Error,can't send response {e}")
                         conn.close()
                         break
                     case Commands.LIST:
-                        print("Send file list to client")
+                        debug_print("Send file list to client")
+                        header, payload = command_list()
+                        try:
+                            send_response_header(conn, addr, header)
+                            send_response_payload(conn, addr, payload)
+                        except Exception as e:
+                            debug_print(f"Can't send command list {e}")
+                            debug_print(f"Closing connection with {addr}")
+                            conn.close()
+                    case _:
+                        raise RuntimeError("unimplemented")
