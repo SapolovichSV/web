@@ -1,0 +1,50 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build artifacts
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+.env
+.venv
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Python tools
+.mypy_cache/
+.pyre/
+.pytype/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Nix
+result
+result-*
+
+# Project specific (optional - uncomment if needed)
+# lab1/src/server/server_files/*.txt
+# lab1/src/**/*.bk
