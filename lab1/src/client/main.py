@@ -1,10 +1,11 @@
+import os
 from typing import Any
 import argparse
 import inspect
 import socket
 from sys import exit
 
-from src.models.common import Commands
+from src.models.common import Commands, full_recv
 from src.models.request import Request
 from src.models.files import read_file
 
@@ -16,7 +17,8 @@ from src.models.response import (
     ResponseHeader,
 )
 
-def debug_print(*args:Any) -> None:
+
+def debug_print(*args: Any) -> None:
     frame = inspect.currentframe()
     if frame is None:
         print("[unknown location]", *args)
@@ -86,29 +88,30 @@ def shutdown_client(s: socket.socket) -> None:
 
 
 def catch_response_header(s: socket.socket) -> ResponseHeader:
-    needed: int = RESPONSE_BASE_SIZE_BYTES
-    data: bytearray = bytearray(needed)
-    while needed != 0:
-        if needed <= 0:
-            raise RuntimeError("UB")
-        needed -= s.recv_into(data, needed)
-    return ResponseHeader.deserialize(bytes(data))
-def handle_response(s:socket.socket,resp_header: ResponseHeader)->None:
+    return ResponseHeader.deserialize(full_recv(s, RESPONSE_BASE_SIZE_BYTES))
+
+
+def write_file(data: bytes) -> None:
+    path = os.path.join(os.path.curdir, str("downloaded"))
+    with open(path, "wb") as f:
+        written: int = f.write(data)
+
+    if len(data) != written:
+        raise IOError("len of input bytes != len of written bytes")
+
+
+def handle_response(s: socket.socket, resp_header: ResponseHeader) -> None:
     match resp_header.payload_type:
         case PayloadType.LIST:
-           needed:int  = resp_header.payload_len
-           data: bytearray= bytearray(needed)
-           while needed != 0:
-               if needed <= 0:
-                   raise RuntimeError("UB")
-               needed -= s.recv_into(data,needed)
-           filenames: Filenames = Filenames.deserialize(bytes(data))
-           debug_print(filenames)
+            data_list: bytes = full_recv(s, resp_header.payload_len)
+            filenames: Filenames = Filenames.deserialize(data_list)
+            debug_print(filenames)
+        case PayloadType.FILE:
+            data_file: bytes = full_recv(s, resp_header.payload_len)
+            write_file(data_file)
+
         case _:
             raise RuntimeError("unimplemented")
-
-
-
 
 
 print("Starting client")
@@ -135,20 +138,22 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                         continue
                     payload = read_file(req.payload)
 
-
             except ValueError as e:
                 print(f"input: bad command {e}")
                 continue
             try:
+                debug_print(f"Sending request {req}")
                 send_request(s, SERVER_ADDR, req)
                 if req.cmd == Commands.EXIT:
                     print("Closing client")
                     shutdown_client(s)
+                debug_print("Catching Response")
                 header: ResponseHeader = catch_response_header(s)
+                debug_print(f"Catching ResponseHeader {header}")
                 match header.code:
                     case NetCode.OK:
                         print(f"Catched header {header}")
-                        handle_response(s,header)
+                        handle_response(s, header)
 
                     case NetCode.ERROR:
                         print(f"Catched header {header}")

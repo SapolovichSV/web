@@ -49,6 +49,7 @@ result-*
 # Project specific
 downloaded/
 lab1/downloaded/
+lab1/downloaded
 
 # Uncomment if needed
 # lab1/src/server/server_files/*.txt

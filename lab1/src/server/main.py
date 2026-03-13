@@ -150,7 +150,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                                 )
                         finally:
                             resp = ResponseHeader(code, payload_type, payload_len)
-                            send_response_header(s, addr, resp)
-                            send_response_payload(s, addr, payload)
+                            send_response_header(conn, addr, resp)
+                            send_response_payload(conn, addr, payload)
                     case _:
                         raise RuntimeError("unimplemented")

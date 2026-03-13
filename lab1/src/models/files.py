@@ -10,6 +10,10 @@ def read_file(filepath: str) -> bytes:
         raise IOError(f"No such filepath:{filepath}")
         return bytes()
 
+    if os.path.getsize(filepath) <= 0:
+        raise ValueError(f"Too small file with filepath{filepath}")
+        return bytes()
+
     if os.path.getsize(filepath) > 2**32 - 1:
         raise ValueError(f"Too big file with filepath{filepath}")
         return bytes()

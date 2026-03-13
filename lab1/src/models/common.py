@@ -1,3 +1,4 @@
+import socket
 from enum import Enum
 class Commands(Enum):
     EXIT = 0
@@ -33,3 +34,11 @@ class Payload:
 
     def __repr__(self) -> str:
         return f"ResponsePayload(len={len(self.payload)})"
+def full_recv(s:socket.socket,needed_bytes: int) -> bytes:
+    needed:int = needed_bytes
+    data: bytearray = bytearray(needed)
+    while needed != 0:
+        if needed <= 0:
+            raise RuntimeError("UB")
+        needed -= s.recv_into(data, needed)
+    return bytes(data)
