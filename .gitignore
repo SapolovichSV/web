@@ -40,11 +40,16 @@ Thumbs.db
 .coverage
 htmlcov/
 .tox/
+.ruff_cache/
 
 # Nix
 result
 result-*
 
-# Project specific (optional - uncomment if needed)
+# Project specific
+downloaded/
+lab1/downloaded/
+
+# Uncomment if needed
 # lab1/src/server/server_files/*.txt
 # lab1/src/**/*.bk
