@@ -1,12 +1,12 @@
 import os
 
 
-def check_file_existing(filepath: str) -> bool:
+def is_file_existing(filepath: str) -> bool:
     return os.path.exists(filepath)
 
 
 def read_file(filepath: str) -> bytes:
-    if not check_file_existing(filepath):
+    if not os.path.exists(filepath):
         raise IOError(f"No such filepath:{filepath}")
         return bytes()
 

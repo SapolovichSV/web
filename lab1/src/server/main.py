@@ -2,6 +2,7 @@ from typing import Any
 import os
 import socket
 import argparse
+import threading
 
 from src.models.common import Commands, Payload, UploadHeader, UploadPayload, full_recv
 from src.models.response import (
@@ -131,39 +132,40 @@ def handle_upload(conn: socket.socket, data_request: Request) -> None:
     debug_print(f"wrote file at {filepath}")
 
 
-def serve_connection(conn: socket.socket) -> None:
+def serve_connection(conn: socket.socket, addr: tuple[str, int]) -> None:
     debug_print(f"Connected by {addr}")
-    while True:
-        debug_print("In cycle")
-        try:
-            data: bytes = conn.recv(REQUEST_BYTES_SIZE)
-            if not data:
-                print("Client disconnected")
-                break
-            data_request: Request = Request.deserialize(data)
-        except Exception as e:
-            debug_print(f"error {e}")
-            continue
-        try:
-        # debug_print(data)
-            match data_request.cmd:
-                case Commands.EXIT:
-                    handle_exit(conn)
-                case Commands.LIST:
-                    handle_list(conn)
-                    continue
-                case Commands.DOWNLOAD:
-                    handle_download(conn, data_request)
-                    continue
-                case Commands.UPLOAD:
-                    handle_upload(conn, data_request)
-                    continue
-                case _:
-                    raise RuntimeError("unimplemented")
-        except ValueError as e:
-            print(e)
-        except Exception as e:
-            print(f"unexpected {e}")
+    with conn:
+        while True:
+            debug_print("In cycle")
+            try:
+                data: bytes = conn.recv(REQUEST_BYTES_SIZE)
+                if not data:
+                    print("Client disconnected")
+                    break
+                data_request: Request = Request.deserialize(data)
+            except Exception as e:
+                debug_print(f"error {e}")
+                continue
+            try:
+            # debug_print(data)
+                match data_request.cmd:
+                    case Commands.EXIT:
+                        handle_exit(conn)
+                    case Commands.LIST:
+                        handle_list(conn)
+                        continue
+                    case Commands.DOWNLOAD:
+                        handle_download(conn, data_request)
+                        continue
+                    case Commands.UPLOAD:
+                        handle_upload(conn, data_request)
+                        continue
+                    case _:
+                        raise RuntimeError("unimplemented")
+            except ValueError as e:
+                print(e)
+            except Exception as e:
+                print(f"unexpected {e}")
 
 
 debug_print("Starting server")
@@ -180,12 +182,12 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind((HOST, PORT))
     s.listen()
-    while True:
-        conn, addr = s.accept()
-        with conn:
-            try:
-                serve_connection(conn)
-            except KeyboardInterrupt:
-                print("Cathced ctrl+c,closing server")
-                s.close()
-                exit(0)
+    try:
+        while True:
+            conn, addr = s.accept()
+            client_thread = threading.Thread(target=serve_connection, args=(conn, addr), daemon=True)
+            client_thread.start()
+    except KeyboardInterrupt:
+        print("Caught ctrl+c, closing server")
+        s.close()
+        exit(0)

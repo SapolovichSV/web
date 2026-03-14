@@ -50,7 +50,7 @@ def parse_user_commands() -> Request:
                 case "LIST":
                     req = Request(Commands.LIST, None)
                 case _:
-                    pass
+                    raise ValueError(f"Incorrect user input: {inp[0]}")
         case 2:
             match inp[0]:
                 case "UPLOAD":
@@ -58,7 +58,7 @@ def parse_user_commands() -> Request:
                 case "DOWNLOAD":
                     req = Request(Commands.DOWNLOAD, inp[1])
                 case _:
-                    pass
+                    raise ValueError(f"Incorrect user input: {inp[1]}")
         case _:
             raise ValueError(f"Incorrect user input: {len(inp)}")
     return req
@@ -134,20 +134,22 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         while True:
             try:
                 req: Request = parse_user_commands()
-                if req.cmd == Commands.UPLOAD:
-                    if not req.payload:
-                        print(f"Bad input {req.payload}")
-                        continue
-                    payload = UploadPayload(read_file(req.payload))
-                    send_request(s, SERVER_ADDR, req)
-                    send_upload_payload(s, SERVER_ADDR, payload)
-                    continue
-
             except ValueError as e:
                 print(f"input: bad command {e}")
                 continue
-            except IOError as e:
-                print(f"Bad file error:{e}")
+            if req.cmd == Commands.UPLOAD:
+                if not req.payload:
+                    print(f"Bad input {req.payload}")
+                    continue
+                try:
+                    payload = UploadPayload(read_file(req.payload))
+                except (IOError, ValueError) as e:
+                    print(f"Command error : {e}")
+                    continue
+                send_request(s, SERVER_ADDR, req)
+                send_upload_payload(s, SERVER_ADDR, payload)
+                continue
+
             try:
                 debug_print(f"Sending request {req}")
                 send_request(s, SERVER_ADDR, req)
