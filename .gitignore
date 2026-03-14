@@ -45,6 +45,7 @@ htmlcov/
 # Nix
 result
 result-*
+.direnv
 
 # Project specific
 downloaded/
