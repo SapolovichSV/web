@@ -50,6 +50,8 @@ result-*
 downloaded/
 lab1/downloaded/
 lab1/downloaded
+*.txt
+
 
 # Uncomment if needed
 # lab1/src/server/server_files/*.txt

@@ -5,9 +5,9 @@ import inspect
 import socket
 from sys import exit
 
-from src.models.common import Commands, full_recv
+from src.models.common import Commands, full_recv, UploadPayload
 from src.models.request import Request
-from src.models.files import read_file
+from src.models.files import read_file, write_file
 
 from src.models.response import (
     RESPONSE_BASE_SIZE_BYTES,
@@ -82,6 +82,16 @@ def send_request(s: socket.socket, addr: tuple[str, int], req: Request) -> None:
     # return data
 
 
+def send_upload_payload(
+    s: socket.socket, addr: tuple[str, int], upload_payload: UploadPayload
+) -> None:
+    try:
+        s.sendall(upload_payload.get_header())
+        s.sendall(upload_payload.get_payload())
+    except Exception as e:
+        print(f"Error : {e}")
+
+
 def shutdown_client(s: socket.socket) -> None:
     s.close()
     exit(0)
@@ -91,16 +101,8 @@ def catch_response_header(s: socket.socket) -> ResponseHeader:
     return ResponseHeader.deserialize(full_recv(s, RESPONSE_BASE_SIZE_BYTES))
 
 
-def write_file(data: bytes) -> None:
-    path = os.path.join(os.path.curdir, str("downloaded"))
-    with open(path, "wb") as f:
-        written: int = f.write(data)
-
-    if len(data) != written:
-        raise IOError("len of input bytes != len of written bytes")
-
-
 def handle_response(s: socket.socket, resp_header: ResponseHeader) -> None:
+    FILEPATH = os.path.join(os.path.curdir, "downloaded")
     match resp_header.payload_type:
         case PayloadType.LIST:
             data_list: bytes = full_recv(s, resp_header.payload_len)
@@ -108,7 +110,7 @@ def handle_response(s: socket.socket, resp_header: ResponseHeader) -> None:
             debug_print(filenames)
         case PayloadType.FILE:
             data_file: bytes = full_recv(s, resp_header.payload_len)
-            write_file(data_file)
+            write_file(FILEPATH, data_file)
 
         case _:
             raise RuntimeError("unimplemented")
@@ -136,11 +138,16 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     if not req.payload:
                         print(f"Bad input {req.payload}")
                         continue
-                    payload = read_file(req.payload)
+                    payload = UploadPayload(read_file(req.payload))
+                    send_request(s, SERVER_ADDR, req)
+                    send_upload_payload(s, SERVER_ADDR, payload)
+                    continue
 
             except ValueError as e:
                 print(f"input: bad command {e}")
                 continue
+            except IOError as e:
+                print(f"Bad file error:{e}")
             try:
                 debug_print(f"Sending request {req}")
                 send_request(s, SERVER_ADDR, req)

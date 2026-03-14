@@ -20,3 +20,14 @@ def read_file(filepath: str) -> bytes:
 
     with open(filepath, "rb") as file:
         return file.read()
+
+
+def write_file(path: str, data: bytes) -> None:
+
+    with open(path, "wb") as f:
+        written: int = f.write(data)
+        print(f"wrote {written} bytes")
+        f.flush()
+
+    if len(data) != written:
+        raise IOError("len of input bytes != len of written bytes")
